@@ -4,7 +4,12 @@ import pandas as pd
 class ProblemDetector:
 
     def __init__(self, df):
+
         self.df = df
+
+    # ==========================================
+    # FIND POSSIBLE TARGET COLUMNS
+    # ==========================================
 
     def find_target_candidates(self):
 
@@ -15,8 +20,11 @@ class ProblemDetector:
             unique_values = self.df[column].nunique()
             data_type = self.df[column].dtype
 
-            # Categorical column
-            if data_type == "object" or str(data_type) == "category":
+            # Categorical columns
+            if (
+                data_type == "object"
+                or str(data_type) == "category"
+            ):
 
                 candidates.append({
                     "column": column,
@@ -24,7 +32,7 @@ class ProblemDetector:
                     "unique_values": unique_values
                 })
 
-            # Numerical column with relatively few unique values
+            # Numerical columns with few unique values
             elif unique_values <= 10:
 
                 candidates.append({
@@ -35,33 +43,35 @@ class ProblemDetector:
 
         return candidates
 
+    # ==========================================
+    # DETECT MACHINE LEARNING PROBLEM
+    # ==========================================
+
     def detect_problem(self, target_column):
 
         target = self.df[target_column]
 
         unique_values = target.nunique()
 
+        # Numerical target
         if pd.api.types.is_numeric_dtype(target):
 
             if unique_values <= 10:
 
-                problem_type = "Classification"
+                return "Classification"
 
-            else:
+            return "Regression"
 
-                problem_type = "Regression"
+        # Categorical target
+        if unique_values == 2:
 
-        else:
+            return "Binary Classification"
 
-            if unique_values == 2:
+        return "Multiclass Classification"
 
-                problem_type = "Binary Classification"
-
-            else:
-
-                problem_type = "Multiclass Classification"
-
-        return problem_type
+    # ==========================================
+    # RUN PROBLEM DETECTION
+    # ==========================================
 
     def analyze(self):
 
@@ -78,7 +88,32 @@ class ProblemDetector:
             print(
                 f"{candidate['column']} | "
                 f"Type: {candidate['type']} | "
-                f"Unique values: {candidate['unique_values']}"
+                f"Unique values: "
+                f"{candidate['unique_values']}"
             )
 
-        return candidates
+        # Check whether a candidate was found
+        if not candidates:
+
+            raise ValueError(
+                "No possible target column found."
+            )
+
+        # Select the first candidate
+        target_column = candidates[0]["column"]
+
+        problem_type = self.detect_problem(
+            target_column
+        )
+
+        print(
+            f"\nDetected target: "
+            f"{target_column}"
+        )
+
+        print(
+            f"Detected problem type: "
+            f"{problem_type}"
+        )
+
+        return target_column, problem_type
