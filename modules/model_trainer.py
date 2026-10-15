@@ -13,6 +13,10 @@ class ModelTrainer:
         self.models = models
         self.results = {}
 
+    # ==========================================
+    # TRAIN AND EVALUATE MODELS
+    # ==========================================
+
     def train_and_evaluate(
         self,
         X_train,
@@ -29,18 +33,27 @@ class ModelTrainer:
 
             print(f"\nTraining: {name}")
 
-            # Train the model
+            # ==========================================
+            # TRAIN MODEL
+            # ==========================================
+
             model.fit(
                 X_train,
                 y_train
             )
 
-            # Make predictions
+            # ==========================================
+            # MAKE PREDICTIONS
+            # ==========================================
+
             y_pred = model.predict(
                 X_test
             )
 
-            # Calculate metrics
+            # ==========================================
+            # CALCULATE METRICS
+            # ==========================================
+
             accuracy = accuracy_score(
                 y_test,
                 y_pred
@@ -49,20 +62,27 @@ class ModelTrainer:
             precision = precision_score(
                 y_test,
                 y_pred,
-                pos_label="M"
+                average="weighted",
+                zero_division=0
             )
 
             recall = recall_score(
                 y_test,
                 y_pred,
-                pos_label="M"
+                average="weighted",
+                zero_division=0
             )
 
             f1 = f1_score(
                 y_test,
                 y_pred,
-                pos_label="M"
+                average="weighted",
+                zero_division=0
             )
+
+            # ==========================================
+            # STORE RESULTS
+            # ==========================================
 
             self.results[name] = {
 
@@ -74,6 +94,10 @@ class ModelTrainer:
 
                 "F1 Score": f1
             }
+
+            # ==========================================
+            # DISPLAY RESULTS
+            # ==========================================
 
             print(
                 f"Accuracy: {accuracy:.4f}"
@@ -92,22 +116,33 @@ class ModelTrainer:
             )
 
         return self.results
+
+    # ==========================================
+    # SELECT BEST MODEL
+    # ==========================================
+
     def select_best_model(self):
+
         print("\n" + "=" * 50)
         print("BEST MODEL SELECTION")
         print("=" * 50)
+
         best_model_name = max(
             self.results,
             key=lambda model:
             self.results[model]["F1 Score"]
-    )
+        )
+
         best_score = self.results[
-        best_model_name
+            best_model_name
         ]["F1 Score"]
+
         print(
             f"\nBest model: {best_model_name}"
-            )
+        )
+
         print(
             f"Best F1 Score: {best_score:.4f}"
-    )
+        )
+
         return best_model_name

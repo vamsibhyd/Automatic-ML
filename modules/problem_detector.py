@@ -4,8 +4,7 @@ import pandas as pd
 class ProblemDetector:
 
     def __init__(self, df):
-
-        self.df = df
+        self.df = df.copy()
 
     # ==========================================
     # FIND POSSIBLE TARGET COLUMNS
@@ -17,13 +16,22 @@ class ProblemDetector:
 
         for column in self.df.columns:
 
-            unique_values = self.df[column].nunique()
-            data_type = self.df[column].dtype
+            series = self.df[column]
+            unique_values = series.nunique()
+            data_type = series.dtype
+
+            # Skip columns containing only one unique value
+            if unique_values <= 1:
+                continue
 
             # Categorical columns
             if (
-                data_type == "object"
-                or str(data_type) == "category"
+                pd.api.types.is_object_dtype(series)
+                or isinstance(
+                    data_type,
+                    pd.CategoricalDtype
+                )
+                or pd.api.types.is_bool_dtype(series)
             ):
 
                 candidates.append({
@@ -32,8 +40,17 @@ class ProblemDetector:
                     "unique_values": unique_values
                 })
 
-            # Numerical columns with few unique values
+            # Numerical columns with relatively few unique values
             elif unique_values <= 10:
+
+                candidates.append({
+                    "column": column,
+                    "type": "numerical",
+                    "unique_values": unique_values
+                })
+
+            # Numerical columns with many unique values
+            elif pd.api.types.is_numeric_dtype(series):
 
                 candidates.append({
                     "column": column,
@@ -49,31 +66,68 @@ class ProblemDetector:
 
     def detect_problem(self, target_column):
 
-        target = self.df[target_column]
+        if target_column not in self.df.columns:
+            raise ValueError(
+                f"Target column '{target_column}' "
+                "does not exist in the dataset."
+            )
+
+        target = self.df[target_column].dropna()
+
+        if target.empty:
+            raise ValueError(
+                "The target column contains no valid values."
+            )
 
         unique_values = target.nunique()
 
-        # Numerical target
-        if pd.api.types.is_numeric_dtype(target):
+        # A constant target cannot support meaningful prediction
+        if unique_values < 2:
+            raise ValueError(
+                "The target must contain at least "
+                "two distinct values."
+            )
 
-            if unique_values <= 10:
+        # Categorical targets indicate classification
+        if (
+            pd.api.types.is_object_dtype(target)
+            or isinstance(
+                target.dtype,
+                pd.CategoricalDtype
+            )
+            or pd.api.types.is_bool_dtype(target)
+        ):
 
-                return "Classification"
+            if unique_values == 2:
+                return "Binary Classification"
 
-            return "Regression"
+            return "Multiclass Classification"
 
-        # Categorical target
+        # Numeric targets with two distinct values
+        # are treated as binary classification by default.
         if unique_values == 2:
-
             return "Binary Classification"
 
-        return "Multiclass Classification"
+        # Numeric targets with a small number of distinct values
+        # are treated as classification candidates.
+        if unique_values <= 10:
+            return "Multiclass Classification"
+
+        # Numeric targets with many distinct values
+        # are treated as regression candidates.
+        if pd.api.types.is_numeric_dtype(target):
+            return "Regression"
+
+        raise ValueError(
+            "Unable to determine the problem type. "
+            "Please specify it manually."
+        )
 
     # ==========================================
     # RUN PROBLEM DETECTION
     # ==========================================
 
-    def analyze(self):
+    def analyze(self, target_column=None):
 
         print("\n" + "=" * 50)
         print("PROBLEM DETECTION")
@@ -92,28 +146,73 @@ class ProblemDetector:
                 f"{candidate['unique_values']}"
             )
 
-        # Check whether a candidate was found
         if not candidates:
-
             raise ValueError(
                 "No possible target column found."
             )
 
-        # Select the first candidate
-        target_column = candidates[0]["column"]
+        # Use the explicitly selected target when provided.
+        if target_column is not None:
 
-        problem_type = self.detect_problem(
-            target_column
-        )
+            if target_column not in self.df.columns:
+                raise ValueError(
+                    f"Target column '{target_column}' "
+                    "not found."
+                )
 
-        print(
-            f"\nDetected target: "
-            f"{target_column}"
-        )
+        else:
 
-        print(
-            f"Detected problem type: "
-            f"{problem_type}"
-        )
+            # Prefer a conventional target name as a suggestion.
+            # This is a heuristic, not proof that the column
+            # is the correct target.
+            common_target_names = [
+                "target",
+                "label",
+                "class",
+                "outcome",
+                "y"
+            ]
+
+            column_lookup = {
+                str(column).strip().lower(): column
+                for column in self.df.columns
+            }
+
+            target_column = None
+
+            for name in common_target_names:
+
+                if name in column_lookup:
+
+                    candidate_column = column_lookup[name]
+
+                    if (
+                        self.df[candidate_column].nunique() > 1
+                    ):
+                        target_column = candidate_column
+                        break
+
+            if target_column is None:
+
+                raise ValueError(
+                    "Target column could not be determined "
+                    "reliably. Please select the target "
+                    "column explicitly."
+                )
+
+            print(
+                "\nSuggested target based on its name: "
+                f"{target_column}"
+            )
+
+            print(
+                "Please confirm that this is the intended "
+                "prediction target."
+            )
+
+        problem_type = self.detect_problem(target_column)
+
+        print(f"\nDetected target: {target_column}")
+        print(f"Detected problem type: {problem_type}")
 
         return target_column, problem_type

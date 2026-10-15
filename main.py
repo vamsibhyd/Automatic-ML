@@ -14,7 +14,7 @@ from modules.model_trainer import ModelTrainer
 # 1. LOAD DATASET
 # ==========================================
 
-df = pd.read_csv("Sonar.csv")
+df = pd.read_csv("dna.csv")
 
 print("\nDataset loaded successfully!")
 
@@ -157,3 +157,4 @@ results = trainer.train_and_evaluate(
 # ==========================================
 
 best_model = trainer.select_best_model()
+
